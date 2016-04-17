@@ -45,13 +45,13 @@ XivelyClient xivelyclient(client);
 
 
 //variables used for RF LINK
-#define buffer_size 150
+#define buffer_size 155
 #define CORRECTOR 1
-#define SYNC 1750*CORRECTOR
+#define SYNC 1740*CORRECTOR
 #define BIT1_LENGTH  745*CORRECTOR
-#define BIT0_LENGTH  380*CORRECTOR
+#define BIT0_LENGTH  380*CORRECTOR //380
 #define RXPIN  7
-#define DEVIATION 200
+#define DEVIATION 80
 int timings[buffer_size];
 int i, counter;
 int pinstate;
@@ -60,10 +60,6 @@ char bitreceived;
 bool captured_state = false;
 String temp_out, captured_data_str, temp;
 String sensor_id = "0111111010000000";
-
-
-
-
 
 float bintodec (String input)
 {
@@ -76,6 +72,27 @@ float bintodec (String input)
     }
   }
   return value / 10;
+}
+
+bool crc(String input)
+{
+  char x ;
+  int checksumcalc = 0;
+  for (int i = 30; i > -1; i--) {
+    x = input.charAt(i);
+    if (x == '1')
+    {
+      checksumcalc = checksumcalc ^ 1;
+    }
+    else
+      checksumcalc = checksumcalc ^ 0;
+  }
+  x = input.charAt(31);
+  int y = x - '0';
+  if (y == checksumcalc)
+    return true;
+  else
+    return false;
 }
 
 void setup() {
@@ -98,7 +115,7 @@ void setup() {
 void loop() {
   //variables used for DS1820
   //byte bt;
-//  byte present = 0;
+  //  byte present = 0;
   byte type_s;
   byte data[12];
   byte addr[8];
@@ -124,17 +141,19 @@ void loop() {
     }
 
     counter = 0;
+
     while (pinstate == 1)
     {
       pinstate = digitalRead(RXPIN);
     }
 
   }
+  //*********print buffer*****************
   for (int i = 0; i < buffer_size; i++)
   {
-       Serial.println(timings[i]);
+           Serial.println(timings[i]);
   }
-
+  //*********print buffer*****************
   int i = 0;
   while ( i < buffer_size && captured_state == false )
   { //Serial.println("DEBUG1");
@@ -165,12 +184,15 @@ void loop() {
       if (captured_data_str.indexOf('?') == -1)// check the data
       {
         temp = captured_data_str.substring(0, 16);
-        Serial.println(temp);
+        // Serial.println(temp);
         if (temp.equals(sensor_id)) //check the sensor id
         {
-        //  Serial.println("found!!!!!!!!!!");
-          captured_state = true;
-          temp_out = captured_data_str.substring(16, 24);
+          if (crc(captured_data_str))
+          {
+            Serial.println(captured_data_str);
+            captured_state = true;
+            temp_out = captured_data_str.substring(16, 24);
+          }
         }
       }
 
@@ -183,108 +205,111 @@ void loop() {
     Temp_out = bintodec(temp_out);
     Serial.println(Temp_out);
     pinstate = 1;
-    captured_state = false;
+    // captured_state = false;
     datastream_Temp_OUT[0].setFloat(Temp_out);
-//    Serial.println("Uploading it to Xively");
+    //    Serial.println("Uploading it to Xively");
     int ret = xivelyclient.put(feed_Temp_OUT, xivelyKey);
-    Serial.print("xivelyclient.put returned ");
-//    Serial.println(ret);
-   // delay(600);
-//    Serial.println();
+    //    Serial.print("xivelyclient.put returned ");
+    //    Serial.println(ret);
+    delay(1000);
+    //    Serial.println();
   }
-
-  if ( !ds.search(addr)) {
-    //  Serial.println("No more addresses.");
-    //  Serial.println();
-    ds.reset_search();
-    delay(250);
-    return;
-  }
-  /*
-    Serial.print("ROM =");
-    for( i = 0; i < 8; i++) {
-     Serial.write(' ');
-     Serial.print(addr[i], HEX);
-    }
-
-    if (OneWire::crc8(addr, 7) != addr[7]) {
-       Serial.println("CRC is not valid!");
-       return;
-    }
-    Serial.println();
-  */
-  // the first ROM byte indicates which chip
-  switch (addr[0]) {
-    case 0x10:
-      // Serial.println("  Chip = DS18S20");  // or old DS1820
-      type_s = 1;
-      break;
-    case 0x28:
-      //  Serial.println("  Chip = DS18B20");
-      type_s = 0;
-      break;
-    case 0x22:
-      // Serial.println("  Chip = DS1822");
-      type_s = 0;
-      break;
-    default:
-      //   Serial.println("Device is not a DS18x20 family device.");
+  if (captured_state == true)
+  {
+    captured_state = false;
+    if ( !ds.search(addr)) {
+      //  Serial.println("No more addresses.");
+      //  Serial.println();
+      ds.reset_search();
+      delay(250);
       return;
-  }
-
-  ds.reset();
-  ds.select(addr);
-  ds.write(0x44, 1);        // start conversion, with parasite power on at the end
-
-  delay(800);     // maybe 750ms is enough, maybe not
-  // we might do a ds.depower() here, but the reset will take care of it.
-
-  ds.reset();
-  ds.select(addr);
-  ds.write(0xBE);         // Read Scratchpad
-  /*
-    Serial.print("  Data = ");
-    Serial.print(present, HEX);
-    Serial.print(" ");
-  */
-  for ( i = 0; i < 9; i++) {           // we need 9 bytes
-    data[i] = ds.read();
-    //  Serial.print(data[i], HEX);
-    //  Serial.print(" ");
-  }
-  /*
-    Serial.print(" CRC=");
-    Serial.print(OneWire::crc8(data, 8), HEX);
-    Serial.println();
-  */
-  // Convert the data to actual temperature
-  // because the result is a 16 bit signed integer, it should
-  // be stored to an "int16_t" type, which is always 16 bits
-  // even when compiled on a 32 bit processor.
-  int16_t raw = (data[1] << 8) | data[0];
-  if (type_s) {
-    raw = raw << 3; // 9 bit resolution default
-    if (data[7] == 0x10) {
-      // "count remain" gives full 12 bit resolution
-      raw = (raw & 0xFFF0) + 12 - data[6];
     }
-  } else {
-    byte cfg = (data[4] & 0x60);
-    // at lower res, the low bits are undefined, so let's zero them
-    if (cfg == 0x00) raw = raw & ~7;  // 9 bit resolution, 93.75 ms
-    else if (cfg == 0x20) raw = raw & ~3; // 10 bit res, 187.5 ms
-    else if (cfg == 0x40) raw = raw & ~1; // 11 bit res, 375 ms
-    //// default is 12 bit resolution, 750 ms conversion time
-  }
-  celsius = (float)raw / 16.0;
-  Serial.print("Temperature = ");
-  Serial.println(celsius);
-  datastream_Temp_IN[0].setFloat(celsius);
-//  Serial.println("Uploading it to Xively");
-  int ret = xivelyclient.put(feed_Temp_IN, xivelyKey);
-  Serial.print("xivelyclient.put returned ");
-//  Serial.println(ret);
-  //delay(1000);
- // Serial.println();
+    /*
+      Serial.print("ROM =");
+      for( i = 0; i < 8; i++) {
+       Serial.write(' ');
+       Serial.print(addr[i], HEX);
+      }
 
+      if (OneWire::crc8(addr, 7) != addr[7]) {
+         Serial.println("CRC is not valid!");
+         return;
+      }
+      Serial.println();
+    */
+    // the first ROM byte indicates which chip
+    switch (addr[0]) {
+      case 0x10:
+        // Serial.println("  Chip = DS18S20");  // or old DS1820
+        type_s = 1;
+        break;
+      case 0x28:
+        //  Serial.println("  Chip = DS18B20");
+        type_s = 0;
+        break;
+      case 0x22:
+        // Serial.println("  Chip = DS1822");
+        type_s = 0;
+        break;
+      default:
+        //   Serial.println("Device is not a DS18x20 family device.");
+        return;
+    }
+
+    ds.reset();
+    ds.select(addr);
+    ds.write(0x44, 1);        // start conversion, with parasite power on at the end
+
+    delay(800);     // maybe 750ms is enough, maybe not
+    // we might do a ds.depower() here, but the reset will take care of it.
+
+    ds.reset();
+    ds.select(addr);
+    ds.write(0xBE);         // Read Scratchpad
+    /*
+      Serial.print("  Data = ");
+      Serial.print(present, HEX);
+      Serial.print(" ");
+    */
+    for ( i = 0; i < 9; i++) {           // we need 9 bytes
+      data[i] = ds.read();
+      //  Serial.print(data[i], HEX);
+      //  Serial.print(" ");
+    }
+    /*
+      Serial.print(" CRC=");
+      Serial.print(OneWire::crc8(data, 8), HEX);
+      Serial.println();
+    */
+    // Convert the data to actual temperature
+    // because the result is a 16 bit signed integer, it should
+    // be stored to an "int16_t" type, which is always 16 bits
+    // even when compiled on a 32 bit processor.
+    int16_t raw = (data[1] << 8) | data[0];
+    if (type_s) {
+      raw = raw << 3; // 9 bit resolution default
+      if (data[7] == 0x10) {
+        // "count remain" gives full 12 bit resolution
+        raw = (raw & 0xFFF0) + 12 - data[6];
+      }
+    } else {
+      byte cfg = (data[4] & 0x60);
+      // at lower res, the low bits are undefined, so let's zero them
+      if (cfg == 0x00) raw = raw & ~7;  // 9 bit resolution, 93.75 ms
+      else if (cfg == 0x20) raw = raw & ~3; // 10 bit res, 187.5 ms
+      else if (cfg == 0x40) raw = raw & ~1; // 11 bit res, 375 ms
+      //// default is 12 bit resolution, 750 ms conversion time
+    }
+    celsius = (float)raw / 16.0;
+    Serial.print("Temperature = ");
+    Serial.println(celsius);
+    datastream_Temp_IN[0].setFloat(celsius);
+    //  Serial.println("Uploading it to Xively");
+    int ret = xivelyclient.put(feed_Temp_IN, xivelyKey);
+    //  Serial.print("xivelyclient.put returned ");
+    //  Serial.println(ret);
+    //  delay(10000);
+    // Serial.println();
+    
+  }
 }

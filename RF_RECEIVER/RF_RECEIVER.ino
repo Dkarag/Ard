@@ -18,14 +18,14 @@ return value/10;
 
 // ring buffer size has to be large enough to fit
 // data between two successive sync signals
-#define RING_BUFFER_SIZE  100
+#define RING_BUFFER_SIZE  300
 
 #define SYNC_LENGTH  9000
 #define SEP_LENGTH   500
 #define BIT1_LENGTH  4000
 #define BIT0_LENGTH  2000
 
-#define DATAPIN  3  // D3 is interrupt 1
+#define DATAPIN  21  // D3 is interrupt 1
 
 unsigned long timings[RING_BUFFER_SIZE];
 unsigned int syncIndex1 = 0;  // index of the first sync signal
@@ -98,8 +98,8 @@ void handler() {
 void setup() {
   Serial.begin(9600);
   Serial.println("Started.");
-  pinMode(3, INPUT);
-  attachInterrupt(1, handler, CHANGE);
+  pinMode(DATAPIN, INPUT);
+  attachInterrupt(2, handler, CHANGE);
 
 }
 
@@ -111,7 +111,7 @@ void loop() {
     char bitreceived;
    
     // disable interrupt to avoid new data corrupting the buffer
-    detachInterrupt(1);
+    detachInterrupt(2);
     // loop over buffer data
     for(unsigned int i=syncIndex1; i!=syncIndex2; i=(i+2)%RING_BUFFER_SIZE) {
       unsigned long t0 = timings[i], t1 = timings[(i+1)%RING_BUFFER_SIZE];
@@ -146,7 +146,7 @@ void loop() {
     syncIndex2 = 0;
 
     // re-enable interrupt
-    attachInterrupt(1, handler, CHANGE);
+    attachInterrupt(2, handler, CHANGE);
   }
 }
 

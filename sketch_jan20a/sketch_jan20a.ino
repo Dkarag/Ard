@@ -7,7 +7,7 @@
      Description: Use Arduino to Receive RF Remote signal          
  ------------------------------------------------------------- */
 
- const int dataSize = 1500;  //Arduino memory is limited (max=1700)
+ const int dataSize = 500;  //Arduino memory is limited (max=1700)
  byte storedData[dataSize];  //Create an array to store the data
  #define ledPin 13           //Onboard LED = digital pin 13
  #define rfReceivePin A0     //RF Receiver data pin = Analog pin 0
