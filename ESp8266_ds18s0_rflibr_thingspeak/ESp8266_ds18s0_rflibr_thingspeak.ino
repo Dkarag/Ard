@@ -1,4 +1,5 @@
 #include <ESP8266WiFi.h>
+
 #include <Esp.h>
 #include <ThingSpeak.h>
 #include <RF433.h>
@@ -10,7 +11,13 @@ extern "C" {
 #include "user_interface.h"
 }
 
+//****************************************
+#define DEBUG
+#define POWER_SAVE_ENABLE
+#define PIR_ENABLE
 
+
+//*********************************************
 #define RFPIN  D2 //pin used  for rf receiver
 #define ONE_WIRE_BUS D1 //pin used  for DS1820 receiver
 #define PIRPIN  D5 //pin used for PIR SENSOR
@@ -58,8 +65,9 @@ void setup() {
   Serial.println("RF_SENSOR.enableRF");
   RF_SENSOR.enableRF();
   ThingSpeak.begin(client);
- // attachInterrupt(digitalPinToInterrupt(PIRPIN), pirhandler, RISING);
-
+#ifdef PIR_ENABLE
+  attachInterrupt(digitalPinToInterrupt(PIRPIN), pirhandler, RISING);
+#endif
 }
 float TEMP_IN;
 float TEMP_OUT;
@@ -68,6 +76,9 @@ char* ALERT_EVENT = "NOT_SET";
 unsigned long TIME1, TIME2;
 
 void loop() {
+#ifdef POWER_SAVE_ENABLE
+  SLEEP_WIFI();
+#endif
   bool UPLOAD = false;
   float h = 0.1;
   digitalWrite(LED_BUILTIN, HIGH);
@@ -103,19 +114,26 @@ void loop() {
   }
   if (UPLOAD == true)
   {
+#ifdef POWER_SAVE_ENABLE
     WAKEUP_WIFI();
+#endif
     delay(500);
     ThingSpeak.setField(1, TEMP_IN);
     ThingSpeak.setField(2, TEMP_OUT);
     ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);
     Serial.println("check2:RF_SENSOR.enableRF");
+#ifdef POWER_SAVE_ENABLE
     SLEEP_WIFI();
+#endif
     RF_SENSOR.enableRF();
   }
+#ifdef PIR_ENABLE
   if (ALERT_EVENT == "SET")
   {
     detachInterrupt(digitalPinToInterrupt(PIRPIN));
+#ifdef POWER_SAVE_ENABLE
     WAKEUP_WIFI();
+#endif
     Serial.println();
     ALERT_EVENT = "RESET";
     ThingSpeak.writeField(myChannelNumber, 3, 100, myWriteAPIKey);
@@ -131,11 +149,14 @@ void loop() {
       ALERT_EVENT = "NOT_SET";
       ThingSpeak.writeField(myChannelNumber, 3, 0, myWriteAPIKey);
       Serial.println("ALERT_EVENT_CLEARED");
+#ifdef POWER_SAVE_ENABLE
       SLEEP_WIFI();
+#endif
       attachInterrupt(digitalPinToInterrupt(PIRPIN), pirhandler, RISING);
       RF_SENSOR.enableRF();
     }
   }
+#endif
 }
 
 void pirhandler()
@@ -143,7 +164,6 @@ void pirhandler()
   RF_SENSOR.disableRF();
   ALERT_EVENT = "SET";
 }
-
 
 void SLEEP_WIFI()
 {
