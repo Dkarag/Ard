@@ -77,7 +77,7 @@ unsigned long TIME1, TIME2;
 
 void loop() {
 #ifdef POWER_SAVE_ENABLE
-  SLEEP_WIFI();
+ // SLEEP_WIFI();
 #endif
   bool UPLOAD = false;
   float h = 0.1;
@@ -172,7 +172,7 @@ void SLEEP_WIFI()
     WiFi.disconnect();
     WiFi.mode(WIFI_OFF);
     WiFi.forceSleepBegin();
-    delay(2000);
+    delay(3000);
     Serial.println(WiFi.status());
   }
 }

@@ -73,7 +73,19 @@ void EspDrv::wifiDriverInit(Stream *espSerial)
 
 	EspDrv::espSerial = espSerial;
 
-	if (sendCmd(F("AT")) != TAG_OK)
+	bool initOK = false;
+	
+	for(int i=0; i<5; i++)
+	{
+		if (sendCmd(F("AT")) == TAG_OK)
+		{
+			initOK=true;
+			break;
+		}
+		delay(1000);
+	}
+
+	if (!initOK)
 	{
 		LOGERROR(F("Cannot initialize ESP module"));
 		delay(5000);
@@ -148,7 +160,7 @@ bool EspDrv::wifiConnect(char* ssid, const char *passphrase)
 		return true;
 	}
 
-	LOGWARN1(F("Failed to connected to"), ssid);
+	LOGWARN1(F("Failed connecting to"), ssid);
 
 	// clean additional messages logged after the FAIL tag
 	delay(1000);
@@ -470,7 +482,8 @@ uint8_t EspDrv::getScanNetworks()
 		idx = readUntil(1000, "\"", false);
 		if(idx==NUMESPTAGS)
 		{
-			ringBuf.getStr(_networkSsid[ssidListNum], 1);  // 1 = strlen ("\"")
+			memset(_networkSsid[ssidListNum], 0, WL_SSID_MAX_LENGTH );
+			ringBuf.getStrN(_networkSsid[ssidListNum], 1, WL_SSID_MAX_LENGTH-1);
 		}
 		
 		// discard , character
