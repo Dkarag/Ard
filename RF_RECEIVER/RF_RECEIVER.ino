@@ -25,7 +25,7 @@ return value/10;
 #define BIT1_LENGTH  4000
 #define BIT0_LENGTH  2000
 
-#define DATAPIN  21  // D3 is interrupt 1
+#define DATAPIN  2  // D3 is interrupt 1
 
 unsigned long timings[RING_BUFFER_SIZE];
 unsigned int syncIndex1 = 0;  // index of the first sync signal

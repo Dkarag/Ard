@@ -13,8 +13,8 @@ extern "C" {
 
 //****************************************
 #define DEBUG
-//#define POWER_SAVE_ENABLE
-//#define PIR_ENABLE
+#define POWER_SAVE_ENABLE
+#define PIR_ENABLE
 
 
 //*********************************************
